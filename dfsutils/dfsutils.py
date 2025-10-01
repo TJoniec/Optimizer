@@ -266,7 +266,7 @@ def fuzzy_match_and_merge(
     merged_df = merged_df.reindex(columns=final_cols_order)
 
 
-    return merged_df, diag
+    return merged_df
 
 
 # Classify WR Matchup Grades - Corrected function to handle individual scores
@@ -509,3 +509,103 @@ def get_team_abbreviation(team_name):
         return team_name
     key = _norm(str(team_name))
     return _ALIAS.get(key, team_name)  # fall back to original if not found
+
+
+def calculate_percentile_and_grade(df, column_name, positions=None, grade_map=None):
+    """
+    Calculates percentiles and ranks for a column within each position group,
+    optionally filters by position, and maps percentiles to categorical grades.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        column_name (str): The name of the column to calculate percentiles and ranks for.
+        positions (str or list, optional): A single position or a list of positions
+                                           to include in the calculation. If None,
+                                           calculations are performed for all positions.
+                                           Defaults to None.
+        grade_map (dict, optional): A dictionary mapping percentile thresholds
+                                     (inclusive lower bound) to categorical grades.
+                                     Example: {80: "80 Plus", 60: "60 Plus",
+                                               40: "40 Plus", 0: "Below 40"}.
+                                     If None, no grading is applied. Defaults to None.
+
+    Returns:
+        pd.DataFrame: The DataFrame with new columns named f'{column_name}_Percentile',
+                      f'{column_name}_Rank', and optionally f'{column_name}_Grade',
+                      calculated within each position group. Returns the original
+                      DataFrame if the specified column does not exist.
+    """
+    if column_name not in df.columns:
+        print(f"Error: Column '{column_name}' not found in the DataFrame.")
+        return df
+
+    df_calculated = df.copy()
+
+    # Filter by position if specified
+    if positions:
+        if isinstance(positions, str):
+            positions = [positions]
+        df_calculated = df_calculated[df_calculated['position'].isin(positions)].copy() # Use .copy() to avoid SettingWithCopyWarning
+    else:
+        # If no positions are specified, calculate for all positions present
+        df_calculated = df.copy() # Use .copy() to avoid SettingWithCopyWarning
+
+
+    # Calculate percentile and rank within each position group
+    df_calculated[f'{column_name}_Percentile'] = df_calculated.groupby('position')[column_name].rank(pct=True, method='average') * 100
+    df_calculated[f'{column_name}_Rank'] = df_calculated.groupby('position')[column_name].rank(ascending=False, method='average')
+
+
+    # Map percentile to categorical grade if grade_map is provided
+    if grade_map:
+        def assign_grade(percentile):
+            if pd.isna(percentile):
+                return None
+            for threshold in sorted(grade_map.keys(), reverse=True):
+                if percentile >= threshold:
+                    return grade_map[threshold]
+            return None # Should not happen if 0 is in grade_map keys
+
+        df_calculated[f'{column_name}_Grade'] = df_calculated[f'{column_name}_Percentile'].apply(assign_grade)
+
+    # Merge the calculated columns back to the original DataFrame
+    # Using left merge to keep all original rows and add calculated values where applicable
+    cols_to_merge = ['Name', 'position', f'{column_name}_Percentile', f'{column_name}_Rank']
+    if grade_map:
+        cols_to_merge.append(f'{column_name}_Grade')
+
+
+    # Ensure only the necessary columns from df_calculated are merged back
+    # This prevents adding duplicate original columns if df_calculated was a filtered subset
+    df = df.merge(df_calculated[cols_to_merge],
+                  on=['Name', 'position'],
+                  how='left',
+                  suffixes=('', '_calculated'))
+
+    # Clean up the temporary calculated columns if they exist
+    for col in [f'{column_name}_Percentile', f'{column_name}_Rank', f'{column_name}_Grade']:
+        calculated_col = f'{col}_calculated'
+        if calculated_col in df.columns:
+             # Use calculated values from the merge
+            df[col] = df[calculated_col]
+            df = df.drop(columns=[calculated_col])
+
+    return df
+
+# Example Usage (assuming df_optimizer_prep is your DataFrame after merging)
+# Define the grade map
+#custom_grade_map = {
+#    80: "80 Plus",
+#    60: "60 Plus",
+#    40: "40 Plus",
+#    0: "Below 40"
+#}
+
+# Apply the function to calculate percentiles, ranks, and grades for 'fantasyPoints' for RBs, QBs, WRs, TEs, and DSTs
+# df_optimizer_prep_with_percentiles = calculate_percentile_and_grade(df_optimizer_prep,
+#                                                                     'fantasyPoints',
+#                                                                     positions=['rb', 'qb', 'wr', 'te', 'dst'],
+#                                                                     grade_map=custom_grade_map)
+
+# Display the updated DataFrame (optional)
+# display(df_optimizer_prep_with_percentiles.head())
