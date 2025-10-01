@@ -1,1 +1,21 @@
 !wget https://raw.githubusercontent.com/TJoniec/Optimizer/master/dfsutils/dfsutils.py -P /content/
+
+# Example Usage (assuming df_optimizer_prep is your DataFrame after merging)
+# Define the grade map
+custom_grade_map = {
+    80: "80 Plus",
+    60: "60 Plus",
+    40: "40 Plus",
+    0: "Below 40"
+}
+
+# Apply the function to calculate percentiles, ranks, and grades for 'fantasyPoints' for RBs, QBs, WRs, TEs, and DSTs
+df_optimizer_prep_with_percentiles = calculate_percentile_and_grade(
+    df_optimizer_prep,
+    'fantasyPoints',
+    positions=['RB', 'QB', 'WR', 'TE', 'DST'], # Use uppercase as per the refactored df_projections
+    grade_map=custom_grade_map
+)
+
+# Display the updated DataFrame
+display(df_optimizer_prep_with_percentiles.head())

@@ -515,6 +515,7 @@ def calculate_percentile_and_grade(df, column_name, positions=None, grade_map=No
     """
     Calculates percentiles and ranks for a column within each position group,
     optionally filters by position, and maps percentiles to categorical grades.
+    The calculations are performed directly on the input DataFrame.
 
     Args:
         df (pd.DataFrame): The input DataFrame.
@@ -533,28 +534,30 @@ def calculate_percentile_and_grade(df, column_name, positions=None, grade_map=No
         pd.DataFrame: The DataFrame with new columns named f'{column_name}_Percentile',
                       f'{column_name}_Rank', and optionally f'{column_name}_Grade',
                       calculated within each position group. Returns the original
-                      DataFrame if the specified column does not exist.
+                      DataFrame if the specified column does not exist or if 'position'
+                      column is missing.
     """
     if column_name not in df.columns:
         print(f"Error: Column '{column_name}' not found in the DataFrame.")
         return df
 
-    df_calculated = df.copy()
+    if 'position' not in df.columns:
+        print("Error: 'position' column not found in the DataFrame.")
+        return df
+
+    # Create a copy to avoid modifying the original DataFrame directly if filtering
+    df_processed = df.copy()
 
     # Filter by position if specified
     if positions:
         if isinstance(positions, str):
             positions = [positions]
-        df_calculated = df_calculated[df_calculated['position'].isin(positions)].copy() # Use .copy() to avoid SettingWithCopyWarning
-    else:
-        # If no positions are specified, calculate for all positions present
-        df_calculated = df.copy() # Use .copy() to avoid SettingWithCopyWarning
-
+        df_processed = df_processed[df_processed['position'].isin(positions)]
 
     # Calculate percentile and rank within each position group
-    df_calculated[f'{column_name}_Percentile'] = df_calculated.groupby('position')[column_name].rank(pct=True, method='average') * 100
-    df_calculated[f'{column_name}_Rank'] = df_calculated.groupby('position')[column_name].rank(ascending=False, method='average')
-
+    # Apply calculations to the original df and not the filtered df_processed
+    df[f'{column_name}_Percentile'] = df.groupby('position')[column_name].rank(pct=True, method='average') * 100
+    df[f'{column_name}_Rank'] = df.groupby('position')[column_name].rank(ascending=False, method='average')
 
     # Map percentile to categorical grade if grade_map is provided
     if grade_map:
@@ -566,29 +569,7 @@ def calculate_percentile_and_grade(df, column_name, positions=None, grade_map=No
                     return grade_map[threshold]
             return None # Should not happen if 0 is in grade_map keys
 
-        df_calculated[f'{column_name}_Grade'] = df_calculated[f'{column_name}_Percentile'].apply(assign_grade)
-
-    # Merge the calculated columns back to the original DataFrame
-    # Using left merge to keep all original rows and add calculated values where applicable
-    cols_to_merge = ['Name', 'position', f'{column_name}_Percentile', f'{column_name}_Rank']
-    if grade_map:
-        cols_to_merge.append(f'{column_name}_Grade')
-
-
-    # Ensure only the necessary columns from df_calculated are merged back
-    # This prevents adding duplicate original columns if df_calculated was a filtered subset
-    df = df.merge(df_calculated[cols_to_merge],
-                  on=['Name', 'position'],
-                  how='left',
-                  suffixes=('', '_calculated'))
-
-    # Clean up the temporary calculated columns if they exist
-    for col in [f'{column_name}_Percentile', f'{column_name}_Rank', f'{column_name}_Grade']:
-        calculated_col = f'{col}_calculated'
-        if calculated_col in df.columns:
-             # Use calculated values from the merge
-            df[col] = df[calculated_col]
-            df = df.drop(columns=[calculated_col])
+        df[f'{column_name}_Grade'] = df[f'{column_name}_Percentile'].apply(assign_grade)
 
     return df
 
@@ -609,3 +590,4 @@ def calculate_percentile_and_grade(df, column_name, positions=None, grade_map=No
 
 # Display the updated DataFrame (optional)
 # display(df_optimizer_prep_with_percentiles.head())
+# fINISH
