@@ -602,3 +602,83 @@ def calculate_percentile_and_grade(df, column_name, positions=None, grade_map=No
 
 # Display the updated DataFrame (optional)
 # display(df_optimizer_prep_with_percentiles.head())
+
+def debug_nan_rows(df, columns_to_display, query_column):
+    """
+    Displays specified columns for rows where a query column has NaN values.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        columns_to_display (list): A list of column names to display.
+        query_column (str): The name of the column to check for NaN values.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the specified columns for rows
+                      with NaN values in the query column. Returns an empty
+                      DataFrame if no NaNs are found or if columns are missing.
+    """
+    if query_column not in df.columns:
+        print(f"Error: Query column '{query_column}' not found in the DataFrame.")
+        return pd.DataFrame()
+
+    # Filter rows where the query column is NaN
+    nan_rows_df = df[df[query_column].isna()]
+
+    # Check if all columns to display exist
+    if not all(col in df.columns for col in columns_to_display):
+        missing_cols = [col for col in columns_to_display if col not in df.columns]
+        print(f"Warning: The following display columns were not found and will be excluded: {missing_cols}")
+        columns_to_display = [col for col in columns_to_display if col in df.columns]
+
+
+    # Select the specified columns
+    if columns_to_display:
+      result_df = nan_rows_df[columns_to_display]
+    else:
+      # If no columns to display are specified or found after checking, return all columns of nan_rows_df
+      result_df = nan_rows_df
+
+
+    return result_df
+
+# Example usage:
+# Assuming df_final is your DataFrame
+# columns_to_show = ['Name', 'teamName', 'position', 'fantasyPoints', 'ActualFPTS']
+# nan_fantasy_points_rows = debug_nan_rows(df_final, columns_to_show, 'fantasyPoints')
+# display(nan_fantasy_points_rows)
+
+def drop_rows_with_nan_excluding(df, exclude_columns=None):
+    """
+    Deletes rows from a DataFrame that contain NaN values in any column,
+    optionally excluding a specified list of columns from this check.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        exclude_columns (list, optional): A list of column names to exclude
+                                         when checking for NaN values. Rows
+                                         will not be deleted based on NaN values
+                                         in these columns. Defaults to None.
+
+    Returns:
+        pd.DataFrame: The DataFrame with rows containing NaN values (outside
+                      of excluded columns) removed.
+    """
+    if exclude_columns is None:
+        exclude_columns = []
+
+    # Determine the columns to check for NaN values
+    columns_to_check = [col for col in df.columns if col not in exclude_columns]
+
+    if not columns_to_check:
+        print("Warning: All columns are excluded from NaN check. No rows will be dropped.")
+        return df
+
+    # Drop rows where any of the specified columns have NaN values
+    df_cleaned = df.dropna(subset=columns_to_check).copy()
+
+    return df_cleaned
+
+# Example Usage:
+# Assuming df_final is your DataFrame
+# cleaned_df = drop_rows_with_nan_excluding(df_final, exclude_columns=['ActualFPTS_Grade', 'some_other_calculated_column'])
+# display(cleaned_df.head())
