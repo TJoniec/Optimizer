@@ -682,3 +682,97 @@ def drop_rows_with_nan_excluding(df, exclude_columns=None):
 # Assuming df_final is your DataFrame
 # cleaned_df = drop_rows_with_nan_excluding(df_final, exclude_columns=['ActualFPTS_Grade', 'some_other_calculated_column'])
 # display(cleaned_df.head())
+
+def display_selected_columns(df, columns_to_display):
+    """
+    Displays only the specified columns of a DataFrame.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        columns_to_display (list): A list of column names to display.
+    """
+    # Check if all columns to display exist in the DataFrame
+    if not all(col in df.columns for col in columns_to_display):
+        missing_cols = [col for col in columns_to_display if col not in df.columns]
+        print(f"Warning: The following columns were not found in the DataFrame and will not be displayed: {missing_cols}")
+        # Filter out missing columns from the list to display
+        columns_to_display = [col for col in columns_to_display if col in df.columns]
+
+    # Display the DataFrame with only the selected columns
+    if columns_to_display:
+        display(df[columns_to_display])
+    else:
+        print("No valid columns to display.")
+
+# Example Usage:
+# Assuming df_final is your DataFrame
+# columns_to_show = ['Name', 'DKSalary', 'fantasyPoints']
+# display_selected_columns(df_final, columns_to_show)
+
+def state_transitions(df, column1, column2, position=None, order=None):
+    """
+    Calculates the state transitions between values in two columns of a DataFrame,
+    optionally filtering by position and specifying the order of values in the output matrix.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        column1 (str): The name of the first column (initial state).
+        column2 (str): The name of the second column (final state).
+        position (str, optional): The position to filter by. If None, transitions
+                                  are calculated for all rows. Defaults to None.
+        order (list, optional): A list specifying the desired order of values
+                                in the rows and columns of the output matrix.
+                                If None, the order will be determined by pandas.
+                                Defaults to None.
+
+    Returns:
+        pd.DataFrame: A cross-tabulation (matrix) showing the number of transitions
+                      from each value in column1 to each value in column2 for the
+                      specified position (or all if None), with the specified order.
+                      Returns an empty DataFrame if columns are not found or if no
+                      data matches the position filter.
+    """
+    if column1 not in df.columns:
+        print(f"Error: Column '{column1}' not found in the DataFrame.")
+        return pd.DataFrame()
+    if column2 not in df.columns:
+        print(f"Error: Column '{column2}' not found in the DataFrame.")
+        return pd.DataFrame()
+    if position is not None and 'position' not in df.columns:
+         print("Error: 'position' column not found in the DataFrame to apply position filter.")
+         return pd.DataFrame()
+
+
+    df_filtered = df.copy()
+
+    # Filter by position if specified
+    if position is not None:
+        df_filtered = df_filtered[df_filtered['position'] == position]
+
+    # Apply specified order if provided
+    if order is not None:
+        # Convert columns to categorical type with specified order
+        df_filtered[column1] = pd.Categorical(df_filtered[column1], categories=order, ordered=True)
+        df_filtered[column2] = pd.Categorical(df_filtered[column2], categories=order, ordered=True)
+
+
+    # Calculate the cross-tabulation of the two columns
+    # Use df_filtered for crosstab calculation
+    transition_matrix = pd.crosstab(df_filtered[column1], df_filtered[column2], dropna=False) # dropna=False to include categories with no data
+
+
+    return transition_matrix
+
+# Example Usage:
+# Assuming df_final is your DataFrame with 'fantasyPoints_Grade' and 'ActualFPTS_Grade'
+# movement_matrix_all = state_transitions(df_final, 'fantasyPoints_Grade', 'ActualFPTS_Grade')
+# display(movement_matrix_all)
+
+# Example Usage with position filter:
+# movement_matrix_rb = state_transitions(df_final, 'fantasyPoints_Grade', 'ActualFPTS_Grade', position='RB')
+# display(movement_matrix_rb)
+
+# Example Usage with specified order:
+# custom_order = ["Top", "Above Average", "Below Average", "Bottom"]
+# movement_matrix_ordered = state_transitions(df_final, 'fantasyPoints_Grade', 'ActualFPTS_Grade', order=custom_order)
+# display(movement_matrix_ordered)
